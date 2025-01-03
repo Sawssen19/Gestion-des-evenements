@@ -1,0 +1,36 @@
+<mat-card class="comment-card">
+  <mat-card-header>
+    <div mat-card-avatar class="comment-avatar">
+      <mat-icon>person</mat-icon>
+    </div>
+    <mat-card-subtitle>
+      <div class="comment-meta">
+        <span>{{ comment.author }}</span>
+        <span>{{ comment.createdAt | date }}</span>
+      </div>
+    </mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    <p>{{ comment.content }}</p>
+  </mat-card-content>
+
+  <mat-card-actions>
+    <button mat-icon-button (click)="onLike.emit(comment.id)">
+      <mat-icon>thumb_up</mat-icon>
+      <span>{{ comment.likes }}</span>
+    </button>
+    <button mat-icon-button (click)="onReply.emit(comment.id)">
+      <mat-icon>reply</mat-icon>
+      Répondre
+    </button>
+  </mat-card-actions>
+
+  <div class="replies" *ngIf="comment.replies && comment.replies.length > 0">
+    <app-comment *ngFor="let reply of comment.replies" 
+                [comment]="reply"
+                (onLike)="onLike.emit($event)"
+                (onReply)="onReply.emit($event)">
+    </app-comment>
+  </div>
+</mat-card>

@@ -1,0 +1,63 @@
+<div class="blog-detail-container" *ngIf="blog">
+  <div class="blog-header">
+    <h1>{{ blog.title }}</h1>
+    <div class="blog-actions">
+      <button mat-icon-button [matMenuTriggerFor]="menu">
+        <mat-icon>more_vert</mat-icon>
+      </button>
+      <mat-menu #menu="matMenu">
+        <button mat-menu-item (click)="editBlog()">
+          <mat-icon>edit</mat-icon>
+          Modifier
+        </button>
+        <button mat-menu-item (click)="deleteBlog()" class="delete-button">
+          <mat-icon>delete</mat-icon>
+          Supprimer
+        </button>
+      </mat-menu>
+    </div>
+  </div>
+
+  <div class="blog-meta">
+    <span class="author">
+      <mat-icon>person</mat-icon>
+      {{ blog.author }}
+    </span>
+    <span class="date">
+      <mat-icon>calendar_today</mat-icon>
+      {{ blog.createdAt | date:'dd/MM/yyyy' }}
+    </span>
+    <span class="views">
+      <mat-icon>visibility</mat-icon>
+      {{ blog.views }} vues
+    </span>
+  </div>
+
+  <div class="blog-content">
+    <markdown [data]="blog.content"></markdown>
+  </div>
+
+  <div class="interaction-section">
+    <button mat-button (click)="toggleLike()" [class.liked]="blog.isLiked">
+      <mat-icon>{{ blog.isLiked ? 'favorite' : 'favorite_border' }}</mat-icon>
+      {{ blog.likes }}
+    </button>
+    <button mat-button (click)="openCommentDialog()">
+      <mat-icon>comment</mat-icon>
+      Commenter
+    </button>
+  </div>
+
+  <div class="comments-section">
+    <h3>Commentaires ({{ blog.commentsCount }})</h3>
+    <app-comment *ngFor="let comment of blog.comments" 
+                [comment]="comment"
+                (replyClicked)="openReplyDialog($event)"
+                (likeClicked)="toggleCommentLike($event)">
+    </app-comment>
+  </div>
+</div>
+
+<div class="loading-spinner" *ngIf="!blog">
+  <mat-spinner></mat-spinner>
+</div>
