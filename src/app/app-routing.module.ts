@@ -3,7 +3,6 @@ import { RouterModule, Routes } from '@angular/router';
 import { BlogListComponent } from './components/blog/blog-list/blog-list.component';
 import { BlogDetailComponent } from './components/blog/blog-detail/blog-detail.component';
 import { AdManagementComponent } from './components/advertisement/ad-management/ad-management.component';
-import { AdStatisticsComponent } from './components/advertisement/ad-statistics/ad-statistics.component';
 import { AdvertisementListComponent } from './components/advertisement/advertisement-list/advertisement-list.component';
 
 const routes: Routes = [
@@ -11,9 +10,27 @@ const routes: Routes = [
   { path: 'blogs', component: BlogListComponent },
   { path: 'blogs/create', component: BlogDetailComponent },
   { path: 'blogs/:id', component: BlogDetailComponent },
-  { path: 'ads', component: AdvertisementListComponent },
-  { path: 'ads/manage', component: AdManagementComponent },
-  { path: 'ads/stats', component: AdStatisticsComponent },
+  {
+    path: 'ads',
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./components/advertisement/advertisement-list/advertisement-list.component')
+            .then(m => m.AdvertisementListComponent)
+      },
+      {
+        path: 'stats',
+        loadComponent: () =>
+          import('./components/advertisement/advertisement-stats/advertisement-stats.component')
+            .then(m => m.AdvertisementStatsComponent)
+      },
+      {
+        path: 'manage',
+        component: AdManagementComponent
+      }
+    ]
+  },
   { path: '**', redirectTo: 'blogs' }
 ];
 

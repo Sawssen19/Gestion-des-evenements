@@ -1,467 +1,576 @@
-import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatSelectModule } from '@angular/material/select';
-import { MatIconModule } from '@angular/material/icon';
-import { MatCardModule } from '@angular/material/card';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatButtonModule } from '@angular/material/button';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { Advertisement } from '../../../models/advertisement.model';
+import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
+import { MatPaginator } from '@angular/material/paginator';
+import { MatSort } from '@angular/material/sort';
+import { MatTableDataSource } from '@angular/material/table';
+import { Advertisement, AdvertisementStatus, AdvertisementType, CreateAdvertisementDTO } from '../../../models/advertisement.model';
 import { AdvertisementService } from '../../../services/advertisement.service';
 import { AdvertisementFormDialogComponent } from '../advertisement-form/advertisement-form-dialog.component';
+import { CommonModule } from '@angular/common';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCardModule } from '@angular/material/card';
+import { MatChipsModule } from '@angular/material/chips';
+import { MatDialogModule } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { MatSelectModule } from '@angular/material/select';
+import { MatSortModule } from '@angular/material/sort';
+import { MatTableModule } from '@angular/material/table';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { FormsModule } from '@angular/forms';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-advertisement-list',
   standalone: true,
   imports: [
     CommonModule,
-    FormsModule,
-    MatFormFieldModule,
-    MatSelectModule,
-    MatIconModule,
+    MatButtonModule,
     MatCardModule,
     MatChipsModule,
-    MatButtonModule,
     MatDialogModule,
-    MatSnackBarModule
+    MatIconModule,
+    MatMenuModule,
+    MatPaginatorModule,
+    MatSelectModule,
+    MatSortModule,
+    MatTableModule,
+    MatTooltipModule,
+    FormsModule
   ],
   template: `
-    <div class="ad-container">
-      <div class="ad-header">
-        <h1>Annonces</h1>
-        <div class="ad-actions">
-          <mat-form-field appearance="outline" class="search-field">
-            <mat-label>Filtrer par type</mat-label>
-            <mat-select [(ngModel)]="selectedType" (selectionChange)="filterByType()">
-              <mat-option value="">Tous</mat-option>
+    <div class="ads-container">
+      <!-- Header avec statistiques -->
+      <div class="ads-header">
+        <div class="stats-cards">
+          <mat-card class="stat-card">
+            <mat-card-content>
+              <div class="stat-value">{{ totalAds }}</div>
+              <div class="stat-label">Total Publicités</div>
+            </mat-card-content>
+          </mat-card>
+          <mat-card class="stat-card">
+            <mat-card-content>
+              <div class="stat-value">{{ activeAds }}</div>
+              <div class="stat-label">Publicités Actives</div>
+            </mat-card-content>
+          </mat-card>
+          <mat-card class="stat-card">
+            <mat-card-content>
+              <div class="stat-value">{{ inactiveAds }}</div>
+              <div class="stat-label">Publicités Inactives</div>
+            </mat-card-content>
+          </mat-card>
+        </div>
+      </div>
+
+      <!-- Filtres et Actions -->
+      <div class="filters-actions">
+        <div class="filters">
+          <mat-form-field appearance="outline">
+            <mat-label>Statut</mat-label>
+            <mat-select [(ngModel)]="selectedStatus" (selectionChange)="applyFilters()">
+              <mat-option value="all">Tous</mat-option>
+              <mat-option value="active">Actif</mat-option>
+              <mat-option value="inactive">Inactif</mat-option>
+              <mat-option value="scheduled">Planifié</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Type</mat-label>
+            <mat-select [(ngModel)]="selectedType" (selectionChange)="applyFilters()">
+              <mat-option value="all">Tous</mat-option>
               <mat-option value="banner">Bannière</mat-option>
               <mat-option value="video">Vidéo</mat-option>
               <mat-option value="sponsored">Sponsorisé</mat-option>
             </mat-select>
           </mat-form-field>
-          <button mat-raised-button color="primary" (click)="openCreateDialog()" class="create-button">
+
+          <mat-form-field appearance="outline">
+            <mat-label>Position</mat-label>
+            <mat-select [(ngModel)]="selectedPosition" (selectionChange)="applyFilters()">
+              <mat-option value="all">Toutes</mat-option>
+              <mat-option value="header">En-tête</mat-option>
+              <mat-option value="sidebar">Barre latérale</mat-option>
+              <mat-option value="content">Contenu</mat-option>
+              <mat-option value="footer">Pied de page</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <div class="actions">
+          <button mat-flat-button color="primary" (click)="openAdDialog()">
             <mat-icon>add</mat-icon>
-            Nouvelle annonce
+            Nouvelle Publicité
           </button>
+          <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Options">
+            <mat-icon>more_vert</mat-icon>
+          </button>
+          <mat-menu #menu="matMenu">
+            <button mat-menu-item (click)="exportAds()">
+              <mat-icon>download</mat-icon>
+              <span>Exporter</span>
+            </button>
+            <button mat-menu-item (click)="refreshAds()">
+              <mat-icon>refresh</mat-icon>
+              <span>Actualiser</span>
+            </button>
+          </mat-menu>
         </div>
       </div>
 
-      <div class="ad-grid">
-        <mat-card *ngFor="let ad of advertisements" class="ad-card fade-in">
-          <mat-card-header>
-            <mat-card-title>{{ ad.title }}</mat-card-title>
-            <mat-card-subtitle>
-              <div class="ad-meta">
-                <span class="ad-type" [class]="ad.type">
-                  <mat-icon>{{ getTypeIcon(ad.type) }}</mat-icon>
-                  {{ ad.type | titlecase }}
-                </span>
-                <span [class]="'status-' + ad.status">
-                  {{ ad.status | titlecase }}
-                </span>
+      <!-- Table des publicités -->
+      <div class="table-container mat-elevation-z8">
+        <table mat-table [dataSource]="dataSource" matSort>
+          <!-- Image Column -->
+          <ng-container matColumnDef="image">
+            <th mat-header-cell *matHeaderCellDef> Image </th>
+            <td mat-cell *matCellDef="let ad">
+              <div class="ad-image">
+                <img [src]="ad.imageUrl || 'assets/images/placeholder.png'" 
+                     [alt]="ad.title"
+                     (error)="onImageError($event)">
               </div>
-            </mat-card-subtitle>
-          </mat-card-header>
+            </td>
+          </ng-container>
 
-          <img *ngIf="ad.imageUrl" mat-card-image [src]="ad.imageUrl" [alt]="ad.title" class="ad-image">
+          <!-- Title Column -->
+          <ng-container matColumnDef="title">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> Titre </th>
+            <td mat-cell *matCellDef="let ad">
+              <div class="ad-title">
+                <span>{{ ad.title }}</span>
+                <mat-chip-row [class]="'status-' + ad.status">
+                  {{ getStatusLabel(ad.status) }}
+                </mat-chip-row>
+              </div>
+            </td>
+          </ng-container>
 
-          <mat-card-content>
-            <p class="ad-description">{{ ad.description }}</p>
-            <div class="ad-details">
-              <div class="detail-item">
-                <mat-icon>calendar_today</mat-icon>
-                <span>{{ ad.startDate | date }} - {{ ad.endDate | date }}</span>
+          <!-- Type Column -->
+          <ng-container matColumnDef="type">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> Type </th>
+            <td mat-cell *matCellDef="let ad">
+              <div class="ad-type">
+                <mat-icon>{{ getTypeIcon(ad.type) }}</mat-icon>
+                <span>{{ getTypeLabel(ad.type) }}</span>
               </div>
-              <div class="detail-item">
-                <mat-icon>location_on</mat-icon>
-                <span>{{ ad.location }}</span>
-              </div>
-            </div>
-            <mat-chip-grid>
-              <mat-chip-row *ngFor="let audience of ad.targetAudience" color="accent" selected>
-                {{ audience }}
-              </mat-chip-row>
-            </mat-chip-grid>
-            <div class="stats">
-              <div class="stat">
-                <span class="stat-label">Vues</span>
-                <span class="stat-value">{{ ad.statistics?.views || 0 }}</span>
-              </div>
-              <div class="stat">
-                <span class="stat-label">Clics</span>
-                <span class="stat-value">{{ ad.statistics?.clicks || 0 }}</span>
-              </div>
-              <div class="stat">
-                <span class="stat-label">Taux de clics</span>
-                <span class="stat-value">{{ ad.statistics?.clickThroughRate || 0 }}%</span>
-              </div>
-            </div>
-          </mat-card-content>
+            </td>
+          </ng-container>
 
-          <mat-card-actions>
-            <a mat-button color="primary" [href]="ad.linkUrl" target="_blank">
-              Voir l'annonce
-            </a>
-            <button mat-button (click)="editAdvertisement(ad)">Modifier</button>
-            <button mat-button color="warn" (click)="deleteAdvertisement(ad)" [disabled]="!ad.id">Supprimer</button>
-          </mat-card-actions>
-        </mat-card>
-      </div>
+          <!-- Position Column -->
+          <ng-container matColumnDef="position">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> Position </th>
+            <td mat-cell *matCellDef="let ad">{{ getPositionLabel(ad.position) }}</td>
+          </ng-container>
 
-      <div *ngIf="advertisements.length === 0" class="no-ads">
-        <mat-icon>campaign</mat-icon>
-        <p>Aucune annonce trouvée</p>
+          <!-- Dates Column -->
+          <ng-container matColumnDef="dates">
+            <th mat-header-cell *matHeaderCellDef> Dates </th>
+            <td mat-cell *matCellDef="let ad">
+              <div class="dates">
+                <div class="date-row">
+                  <mat-icon>event</mat-icon>
+                  <span>{{ formatDate(ad.startDate) }}</span>
+                </div>
+                <div class="date-row">
+                  <mat-icon>event_busy</mat-icon>
+                  <span>{{ formatDate(ad.endDate) }}</span>
+                </div>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Actions Column -->
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef> Actions </th>
+            <td mat-cell *matCellDef="let ad">
+              <button mat-icon-button [matMenuTriggerFor]="actionMenu" 
+                      [matTooltip]="'Options pour ' + ad.title">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #actionMenu="matMenu">
+                <button mat-menu-item (click)="editAd(ad)">
+                  <mat-icon>edit</mat-icon>
+                  <span>Modifier</span>
+                </button>
+                <button mat-menu-item (click)="toggleAdStatus(ad)">
+                  <mat-icon>{{ ad.status === 'active' ? 'pause' : 'play_arrow' }}</mat-icon>
+                  <span>{{ ad.status === 'active' ? 'Désactiver' : 'Activer' }}</span>
+                </button>
+                <button mat-menu-item (click)="duplicateAd(ad)">
+                  <mat-icon>content_copy</mat-icon>
+                  <span>Dupliquer</span>
+                </button>
+                <button mat-menu-item (click)="deleteAd(ad)" class="delete-action">
+                  <mat-icon>delete</mat-icon>
+                  <span>Supprimer</span>
+                </button>
+              </mat-menu>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+
+        <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]"
+                      [pageSize]="10"
+                      showFirstLastButtons>
+        </mat-paginator>
       </div>
     </div>
   `,
   styles: [`
-    .ad-container {
-      padding: 24px;
-      max-width: 1200px;
-      margin: 0 auto;
-      min-height: calc(100vh - 64px);
-      background-color: #f8f9fa;
+    .ads-container {
+      padding: 20px;
     }
 
-    .ad-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 32px;
-      background-color: white;
-      padding: 24px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    .ad-header h1 {
-      font-size: 2.5em;
-      margin: 0;
-      color: #2c3e50;
-      font-weight: 500;
-    }
-
-    .ad-actions {
-      display: flex;
-      gap: 16px;
-      align-items: center;
-    }
-
-    .search-field {
-      width: 200px;
-    }
-
-    .create-button {
-      height: 48px;
-      padding: 0 24px;
-    }
-
-    .ad-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-      gap: 24px;
-      margin-bottom: 24px;
-    }
-
-    .ad-card {
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      transition: transform 0.2s, box-shadow 0.2s;
-      background-color: white;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    .ad-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    .table-container {
+      margin-top: 20px;
+      overflow: auto;
     }
 
     .ad-image {
-      height: 200px;
+      width: 60px;
+      height: 60px;
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #f5f5f5;
+    }
+
+    .ad-image img {
+      width: 100%;
+      height: 100%;
       object-fit: cover;
     }
 
-    .ad-meta {
+    .ad-title {
       display: flex;
-      gap: 16px;
-      margin: 8px 0;
+      align-items: center;
+      gap: 8px;
     }
 
     .ad-type {
       display: flex;
       align-items: center;
+      gap: 8px;
+    }
+
+    .dates {
+      display: flex;
+      flex-direction: column;
       gap: 4px;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 0.9em;
     }
 
-    .banner {
-      background-color: #e3f2fd;
-      color: #1976d2;
+    .date-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
 
-    .video {
-      background-color: #f3e5f5;
-      color: #9c27b0;
+    .date-row mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
     }
 
-    .sponsored {
-      background-color: #e8f5e9;
-      color: #43a047;
+    mat-chip-row {
+      min-height: 24px;
+      padding: 0 8px;
     }
 
     .status-active {
-      color: #43a047;
+      background-color: #4CAF50;
+      color: white;
     }
 
     .status-inactive {
-      color: #e53935;
+      background-color: #9E9E9E;
+      color: white;
     }
 
-    .status-pending {
-      color: #fb8c00;
+    .status-scheduled {
+      background-color: #2196F3;
+      color: white;
     }
 
-    .ad-description {
-      margin: 16px 0;
-      color: #2c3e50;
-      line-height: 1.6;
-    }
-
-    .ad-details {
-      margin: 16px 0;
-    }
-
-    .detail-item {
+    .filters-actions {
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-      color: rgba(0,0,0,0.6);
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      margin-top: 20px;
       gap: 16px;
-      margin: 16px 0;
-      padding: 16px;
-      background-color: #f5f5f5;
-      border-radius: 4px;
     }
 
-    .stat {
+    .filters {
       display: flex;
-      flex-direction: column;
-      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    mat-form-field {
+      width: 200px;
+    }
+
+    .stats-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
       text-align: center;
     }
 
-    .stat-label {
-      font-size: 0.9em;
-      color: rgba(0,0,0,0.6);
-    }
-
     .stat-value {
-      font-size: 1.2em;
+      font-size: 24px;
       font-weight: 500;
-      color: #2c3e50;
+      margin-bottom: 4px;
     }
 
-    mat-card-actions {
-      display: flex;
-      justify-content: flex-end;
-      padding: 8px 16px;
-      margin: 0;
-      gap: 8px;
-    }
-
-    .no-ads {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 48px;
-      background-color: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    .no-ads mat-icon {
-      font-size: 48px;
-      width: 48px;
-      height: 48px;
-      margin-bottom: 16px;
-      color: #95a5a6;
-    }
-
-    .no-ads p {
-      font-size: 1.2em;
-      color: #95a5a6;
-      margin: 0;
-    }
-
-    .fade-in {
-      animation: fadeIn 0.3s ease-in;
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    @media (max-width: 600px) {
-      .ad-header {
-        flex-direction: column;
-        gap: 16px;
-        align-items: stretch;
-      }
-
-      .ad-actions {
-        flex-direction: column;
-      }
-
-      .search-field {
-        width: 100%;
-      }
-
-      .ad-grid {
-        grid-template-columns: 1fr;
-      }
+    .stat-label {
+      color: rgba(0, 0, 0, 0.6);
     }
   `]
 })
-export class AdvertisementListComponent implements OnInit {
-  advertisements: Advertisement[] = [];
-  filteredAdvertisements: Advertisement[] = [];
-  selectedType = '';
+export class AdvertisementListComponent implements OnInit, OnDestroy {
+  displayedColumns: string[] = ['image', 'title', 'type', 'position', 'dates', 'actions'];
+  dataSource: MatTableDataSource<Advertisement>;
+  loading = true;
+  error: string | null = null;
+  private destroy$ = new Subject<void>();
+  selectedType: string = 'all';
+  selectedStatus: string = 'all';
+  selectedPosition: string = 'all';
+  totalAds: number = 0;
+  activeAds: number = 0;
+  get inactiveAds(): number {
+    return this.dataSource.data.filter(ad => ad.status === 'paused').length;
+  }
+
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
+  @ViewChild(MatSort) sort!: MatSort;
 
   constructor(
     private adService: AdvertisementService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar
-  ) {}
-
-  ngOnInit() {
-    this.loadAdvertisements();
+  ) {
+    this.dataSource = new MatTableDataSource<Advertisement>();
   }
 
-  loadAdvertisements() {
-    this.adService.getAdvertisements().subscribe((ads: Advertisement[]) => {
-      this.advertisements = ads;
-      this.filteredAdvertisements = ads;
+  ngOnInit() {
+    this.loadAds();
+  }
+
+  ngAfterViewInit() {
+    this.dataSource.paginator = this.paginator;
+    this.dataSource.sort = this.sort;
+  }
+
+  loadAds() {
+    this.adService.getAdvertisements().pipe(takeUntil(this.destroy$)).subscribe(ads => {
+      this.dataSource.data = ads;
+      this.updateStats(ads);
     });
   }
 
-  filterByType() {
-    if (this.selectedType) {
-      this.adService.getAdvertisementsByType(this.selectedType).subscribe((ads: Advertisement[]) => {
-        this.filteredAdvertisements = ads;
-      });
-    } else {
-      this.loadAdvertisements();
-    }
+  updateStats(ads: Advertisement[]) {
+    this.totalAds = ads.length;
+    this.activeAds = ads.filter(ad => ad.status === 'active').length;
   }
 
-  getTypeIcon(type: string): string {
-    switch (type) {
-      case 'banner':
-        return 'view_carousel';
-      case 'video':
-        return 'videocam';
-      case 'sponsored':
-        return 'star';
-      default:
-        return 'campaign';
+  applyFilters() {
+    let filteredData = this.dataSource.data;
+
+    if (this.selectedStatus !== 'all') {
+      filteredData = filteredData.filter(ad => ad.status === this.selectedStatus);
     }
+
+    if (this.selectedType !== 'all') {
+      filteredData = filteredData.filter(ad => ad.type === this.selectedType);
+    }
+
+    if (this.selectedPosition !== 'all') {
+      filteredData = filteredData.filter(ad => ad.position === this.selectedPosition);
+    }
+
+    this.dataSource.data = filteredData;
   }
 
-  openCreateDialog() {
+  openAdDialog(ad?: Advertisement) {
     const dialogRef = this.dialog.open(AdvertisementFormDialogComponent, {
       width: '800px',
-      data: { isEditing: false }
+      data: { advertisement: ad }
     });
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
-        this.createAdvertisement(result);
-      }
-    });
-  }
-
-  createAdvertisement(result: Omit<Advertisement, 'id'>) {
-    if (result) {
-      this.adService.createAdvertisement(result).subscribe({
-        next: () => {
-          this.loadAdvertisements();
-          this.snackBar.open('Advertisement created successfully', 'Close', { duration: 3000 });
-        },
-        error: (error: Error) => {
-          console.error('Error creating advertisement:', error);
-          this.snackBar.open('Error creating advertisement', 'Close', { duration: 3000 });
+        if (ad) {
+          this.adService.updateAdvertisement(result).subscribe(() => this.loadAds());
+        } else {
+          this.adService.createAdvertisement(result).subscribe(() => this.loadAds());
         }
-      });
-    }
-  }
-
-  editAdvertisement(ad: Advertisement) {
-    const dialogRef = this.dialog.open(AdvertisementFormDialogComponent, {
-      width: '800px',
-      data: { ad, isEditing: true }
-    });
-
-    dialogRef.afterClosed().subscribe(result => {
-      if (result && ad.id) {
-        this.updateAdvertisement(ad, result);
       }
     });
   }
 
-  updateAdvertisement(ad: Advertisement, result: Partial<Advertisement>) {
-    if (!ad.id) {
-      this.snackBar.open('Cannot update advertisement without ID', 'Close', { duration: 3000 });
-      return;
-    }
+  editAd(ad: Advertisement) {
+    this.openAdDialog(ad);
+  }
 
-    this.adService.updateAdvertisement(ad.id, result).subscribe({
+  toggleAdStatus(ad: Advertisement): void {
+    const newStatus: AdvertisementStatus = ad.status === 'active' ? 'paused' : 'active';
+    this.adService.updateAdvertisement({ ...ad, status: newStatus }).subscribe({
       next: () => {
-        this.loadAdvertisements();
-        this.snackBar.open('Advertisement updated successfully', 'Close', { duration: 3000 });
+        this.loadAds();
+        this.showSuccessMessage(`Publicité ${newStatus === 'active' ? 'activée' : 'mise en pause'}`);
       },
-      error: (error: Error) => {
-        console.error('Error updating advertisement:', error);
-        this.snackBar.open('Error updating advertisement', 'Close', { duration: 3000 });
+      error: (error) => {
+        console.error('Error updating advertisement status:', error);
+        this.showErrorMessage('Erreur lors de la mise à jour du statut');
       }
     });
   }
 
-  deleteAdvertisement(ad: Advertisement) {
-    if (!ad.id) {
-      this.snackBar.open('Cannot delete advertisement without ID', 'Close', { duration: 3000 });
-      return;
-    }
+  duplicateAd(ad: Advertisement): void {
+    const duplicatedAd: CreateAdvertisementDTO = {
+      title: `${ad.title} (copie)`,
+      description: ad.description,
+      imageUrl: ad.imageUrl,
+      linkUrl: ad.linkUrl,
+      startDate: new Date(),
+      endDate: new Date(ad.endDate),
+      type: ad.type,
+      position: ad.position,
+      status: 'paused',
+      targetAudience: [...(ad.targetAudience || [])]
+    };
 
-    this.adService.deleteAdvertisement(ad.id).subscribe({
-      next: () => {
-        this.loadAdvertisements();
-        this.snackBar.open('Advertisement deleted successfully', 'Close', { duration: 3000 });
-      },
-      error: (error: Error) => {
-        console.error('Error deleting advertisement:', error);
-        this.snackBar.open('Error deleting advertisement', 'Close', { duration: 3000 });
-      }
+    this.adService.createAdvertisement(duplicatedAd).subscribe(() => this.loadAds());
+  }
+
+  deleteAd(ad: Advertisement) {
+    if (confirm('Êtes-vous sûr de vouloir supprimer cette publicité ?')) {
+      this.adService.deleteAdvertisement(ad.id).subscribe(() => this.loadAds());
+    }
+  }
+
+  exportAds() {
+    const data = this.dataSource.data.map(ad => ({
+      ...ad,
+      status: this.getStatusLabel(ad.status),
+      type: this.getTypeLabel(ad.type),
+      position: this.getPositionLabel(ad.position)
+    }));
+    
+    const csv = this.convertToCSV(data);
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `publicites_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  refreshAds() {
+    this.loadAds();
+  }
+
+  defaultImageUrl = 'https://via.placeholder.com/60x60';
+
+  onImageError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    img.src = this.defaultImageUrl;
+  }
+
+  getStatusLabel(status: string): string {
+    const statusLabels: { [key: string]: string } = {
+      active: 'Actif',
+      inactive: 'Inactif',
+      scheduled: 'Planifié'
+    };
+    return statusLabels[status] || status;
+  }
+
+  getTypeLabel(type: string): string {
+    const typeLabels: { [key: string]: string } = {
+      banner: 'Bannière',
+      video: 'Vidéo',
+      sponsored: 'Sponsorisé'
+    };
+    return typeLabels[type] || type;
+  }
+
+  getTypeIcon(type: string): string {
+    const typeIcons: { [key: string]: string } = {
+      banner: 'view_carousel',
+      video: 'play_circle',
+      sponsored: 'star'
+    };
+    return typeIcons[type] || 'help';
+  }
+
+  getPositionLabel(position: string): string {
+    const positionLabels: { [key: string]: string } = {
+      header: 'En-tête',
+      sidebar: 'Barre latérale',
+      content: 'Contenu',
+      footer: 'Pied de page'
+    };
+    return positionLabels[position] || position;
+  }
+
+  formatDate(date: string | Date): string {
+    if (!date) return '-';
+    return new Date(date).toLocaleDateString('fr-FR', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
     });
+  }
+
+  private convertToCSV(data: any[]): string {
+    const headers = Object.keys(data[0]);
+    const rows = data.map(obj => headers.map(header => obj[header]));
+    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+  }
+
+  showErrorMessage(message: string): void {
+    this.snackBar.open(message, 'Fermer', {
+      duration: 3000,
+      horizontalPosition: 'center',
+      verticalPosition: 'top',
+      panelClass: ['error-snackbar']
+    });
+  }
+
+  showSuccessMessage(message: string): void {
+    this.snackBar.open(message, 'Fermer', {
+      duration: 3000,
+      horizontalPosition: 'center',
+      verticalPosition: 'top',
+      panelClass: ['success-snackbar']
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

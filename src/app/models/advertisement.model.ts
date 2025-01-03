@@ -5,21 +5,34 @@ export interface AdvertisementStatistics {
   revenue: number;
 }
 
+export type AdvertisementStatus = 'active' | 'scheduled' | 'ended' | 'paused';
+export type AdvertisementType = 'banner' | 'video' | 'sponsored';
+export type AdvertisementPosition = 'header' | 'sidebar' | 'content' | 'footer';
+
 export interface Advertisement {
-  id?: string;
+  id: string;
   title: string;
   description: string;
-  imageUrl?: string;
+  imageUrl: string;
   linkUrl: string;
   startDate: Date;
   endDate: Date;
-  location?: string;
-  type: 'banner' | 'video' | 'sponsored';
-  position: 'header' | 'sidebar' | 'content' | 'footer';
-  status: 'active' | 'paused' | 'scheduled' | 'ended';
+  type: AdvertisementType;
+  position: AdvertisementPosition;
+  status: AdvertisementStatus;
+  statistics: AdvertisementStatistics;
   targetAudience?: string[];
-  impressions?: number;
-  clicks?: number;
-  engagement?: number;
-  statistics?: AdvertisementStatistics;
+}
+
+export interface CreateAdvertisementDTO {
+  title: string;
+  description: string;
+  imageUrl: string;
+  linkUrl: string;
+  startDate: Date;
+  endDate: Date;
+  type: AdvertisementType;
+  position: AdvertisementPosition;
+  status?: AdvertisementStatus;
+  targetAudience?: string[];
 }
