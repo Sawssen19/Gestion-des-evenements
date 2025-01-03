@@ -2,11 +2,11 @@ import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { BlogListComponent } from './components/blog/blog-list/blog-list.component';
 import { BlogDetailComponent } from './components/blog/blog-detail/blog-detail.component';
-import { AdManagementComponent } from './components/advertisement/ad-management/ad-management.component';
 import { AdvertisementListComponent } from './components/advertisement/advertisement-list/advertisement-list.component';
+import { AdvertisementStatsComponent } from './components/advertisement/advertisement-stats/advertisement-stats.component';
 
 const routes: Routes = [
-  { path: '', redirectTo: 'blogs', pathMatch: 'full' },
+  { path: '', redirectTo: '/ads/stats', pathMatch: 'full' },
   { path: 'blogs', component: BlogListComponent },
   { path: 'blogs/create', component: BlogDetailComponent },
   { path: 'blogs/:id', component: BlogDetailComponent },
@@ -21,17 +21,11 @@ const routes: Routes = [
       },
       {
         path: 'stats',
-        loadComponent: () =>
-          import('./components/advertisement/advertisement-stats/advertisement-stats.component')
-            .then(m => m.AdvertisementStatsComponent)
-      },
-      {
-        path: 'manage',
-        component: AdManagementComponent
+        component: AdvertisementStatsComponent
       }
     ]
   },
-  { path: '**', redirectTo: 'blogs' }
+  { path: '**', redirectTo: '/ads/stats' }
 ];
 
 @NgModule({

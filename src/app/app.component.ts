@@ -56,10 +56,6 @@ import { Router } from '@angular/router';
               <mat-icon matListItemIcon>analytics</mat-icon>
               <span matListItemTitle>Statistiques</span>
             </a>
-            <a mat-list-item routerLink="/ads/manage" routerLinkActive="active">
-              <mat-icon matListItemIcon>settings</mat-icon>
-              <span matListItemTitle>Gestion</span>
-            </a>
           </mat-nav-list>
         </mat-sidenav>
 
